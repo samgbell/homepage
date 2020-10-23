@@ -9,3 +9,5 @@ ProcessCreationEvents
    or ProcessCommandLine contains "http:"
 | project EventTime, ComputerName, InitiatingProcessFileName, FileName, ProcessCommandLine
 | top 100 by EventTime
+
+// well, .csl doesn't work, let's try .kusto (as per. https://marketplace.visualstudio.com/items?itemName=ms-samples.kusto-language)
