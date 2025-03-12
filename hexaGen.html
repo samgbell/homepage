@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hexagon Drawer</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        #controls {
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            right: 10px;
+            top: 20px;
+            background-color: #f0f0f040;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease-in-out;
+            transform: translateX(100%);
+            z-index: 1;
+            font-family: Arial, sans-serif;
+            color: #e0f85a;
+        }
+        #controls:hover {
+            transform: translateX(0);
+        }
+        label {
+            margin-bottom: 5px;
+        }
+        input[type="range"],
+        input[type="color"],
+        input[type="text"] {
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <label for="size">Size:</label>
+        <input type="range" id="size" min="10" max="200" value="50">
+        <input type="text" id="sizeValue" value="50">
+        <label for="color">Color:</label>
+        <input type="color" id="color" value="#000000">
+        <input type="text" id="colorValue" value="#000000">
+        <label for="margin">Margin:</label>
+        <input type="range" id="margin" min="0" max="50" value="30">
+        <input type="text" id="marginValue" value="30">
+        <label for="bgColor">Background Color:</label>
+        <input type="color" id="bgColor" value="#ffffff">
+        <input type="text" id="bgColorValue" value="#ffffff">
+        <label for="brightnessAdjustment">Brightness Adjustment (%):</label>
+        <input type="range" id="brightnessAdjustment" min="0" max="50" value="10">
+        <input type="text" id="brightnessAdjustmentValue" value="10">
+    </div>
+    <canvas id="canvas" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></canvas>
+
+    <script>
+        function saveSettings() {
+            const size = document.getElementById('size').value;
+            const color = document.getElementById('color').value.slice(1); // Remove the '#' character
+            const margin = document.getElementById('margin').value;
+            const bgColor = document.getElementById('bgColor').value.slice(1); // Remove the '#' character
+            const brightnessAdjustment = document.getElementById('brightnessAdjustment').value;
+
+            const settings = {
+                size,
+                color,
+                margin,
+                bgColor,
+                brightnessAdjustment
+            };
+
+            const hash = Object.keys(settings).map(key => `${key}=${settings[key]}`).join('&');
+            window.location.hash = hash;
+        }
+
+        function loadSettings() {
+            const hash = window.location.hash.substring(1);
+            if (hash) {
+                const settings = {};
+                hash.split('&').forEach(pair => {
+                    const [key, value] = pair.split('=');
+                    settings[key] = value;
+                });
+
+                if (settings.size) {
+                    document.getElementById('size').value = settings.size;
+                    document.getElementById('sizeValue').value = settings.size;
+                }
+                if (settings.color) {
+                    document.getElementById('color').value = `#${settings.color}`;
+                    document.getElementById('colorValue').value = `#${settings.color}`;
+                }
+                if (settings.margin) {
+                    document.getElementById('margin').value = settings.margin;
+                    document.getElementById('marginValue').value = settings.margin;
+                }
+                if (settings.bgColor) {
+                    document.getElementById('bgColor').value = `#${settings.bgColor}`;
+                    document.getElementById('bgColorValue').value = `#${settings.bgColor}`;
+                }
+                if (settings.brightnessAdjustment) {
+                    document.getElementById('brightnessAdjustment').value = settings.brightnessAdjustment;
+                    document.getElementById('brightnessAdjustmentValue').value = settings.brightnessAdjustment;
+                }
+            } else {
+                // Set default values
+                document.getElementById('size').value = 28;
+                document.getElementById('sizeValue').value = 28;
+                document.getElementById('color').value = '#850f0f';
+                document.getElementById('colorValue').value = '#850f0f';
+                document.getElementById('margin').value = 9;
+                document.getElementById('marginValue').value = 9;
+                document.getElementById('bgColor').value = '#3d0000';
+                document.getElementById('bgColorValue').value = '#3d0000';
+                document.getElementById('brightnessAdjustment').value = 10;
+                document.getElementById('brightnessAdjustmentValue').value = 10;
+            }
+        }
+
+        function resizeCanvas() {
+            const canvas = document.getElementById('canvas');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+
+        function drawHexagons() {
+            resizeCanvas();
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+            const size = parseInt(document.getElementById('size').value);
+            const color = document.getElementById('color').value;
+            const margin = parseInt(document.getElementById('margin').value);
+            const bgColor = document.getElementById('bgColor').value;
+            const brightnessAdjustment = parseInt(document.getElementById('brightnessAdjustment').value);
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = bgColor;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const hexHeight = Math.sqrt(3) * size;
+            const hexWidth = 2 * size;
+            const vertDist = hexHeight * 3/4 + margin;
+            const horizDist = hexWidth * 3/4 + margin;
+
+            function adjustBrightness(color, percent) {
+                const num = parseInt(color.slice(1), 16),
+                      amt = Math.round(2.55 * percent),
+                      R = (num >> 16) + amt,
+                      G = (num >> 8 & 0x00FF) + amt,
+                      B = (num & 0x0000FF) + amt;
+                return `#${(0x1000000 + (R<255?R<1?0:R:255)*0x10000 + (G<255?G<1?0:G:255)*0x100 + (B<255?B<1?0:B:255)).toString(16).slice(1)}`;
+            }
+
+            function drawHexagon(x, y) {
+                ctx.save();
+                ctx.translate(x, y);
+                ctx.rotate(Math.PI / 2);
+                ctx.beginPath();
+                for (let i = 0; i < 6; i++) {
+                    ctx.lineTo(size * Math.cos(i * Math.PI / 3), size * Math.sin(i * Math.PI / 3));
+                }
+                ctx.closePath();
+                const brightnessAdjustmentValue = (Math.random() * brightnessAdjustment * 2) - brightnessAdjustment; // Random brightness adjustment between -brightnessAdjustment% and +brightnessAdjustment%
+                ctx.fillStyle = adjustBrightness(color, brightnessAdjustmentValue);
+                ctx.fill();
+
+                // Add highlight effect
+                ctx.strokeStyle = adjustBrightness(color, brightnessAdjustmentValue + 20); // Slightly brighter color for highlight
+                ctx.lineWidth = 2; // Adjust the width of the highlight line
+
+                // Highlight the previous two edges
+                ctx.beginPath();
+                ctx.moveTo(size * Math.cos(2 * Math.PI / 3), size * Math.sin(2 * Math.PI / 3));
+                ctx.lineTo(size * Math.cos(3 * Math.PI / 3), size * Math.sin(3 * Math.PI / 3));
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(size * Math.cos(3 * Math.PI / 3), size * Math.sin(3 * Math.PI / 3));
+                ctx.lineTo(size * Math.cos(4 * Math.PI / 3), size * Math.sin(4 * Math.PI / 3));
+                ctx.stroke();
+
+                ctx.restore();
+            }
+            for (let y = 0, oddRow = true; y < canvas.height + hexHeight; y += vertDist, oddRow = !oddRow) {
+                for (let x = 0; x < canvas.width + hexWidth; x += horizDist) {
+                    drawHexagon(x + (oddRow ? horizDist / 2 : 0), y);
+                }
+            }
+        }
+
+        document.getElementById('size').addEventListener('input', () => {
+            document.getElementById('sizeValue').value = document.getElementById('size').value;
+            drawHexagons();
+            saveSettings();
+        });
+        document.getElementById('color').addEventListener('input', () => {
+            document.getElementById('colorValue').value = document.getElementById('color').value;
+            drawHexagons();
+            saveSettings();
+        });
+        document.getElementById('margin').addEventListener('input', () => {
+            document.getElementById('marginValue').value = document.getElementById('margin').value;
+            drawHexagons();
+            saveSettings();
+        });
+        document.getElementById('bgColor').addEventListener('input', () => {
+            document.getElementById('bgColorValue').value = document.getElementById('bgColor').value;
+            drawHexagons();
+            saveSettings();
+        });
+        document.getElementById('brightnessAdjustment').addEventListener('input', () => {
+            document.getElementById('brightnessAdjustmentValue').value = document.getElementById('brightnessAdjustment').value;
+            drawHexagons();
+            saveSettings();
+        });
+
+        document.getElementById('sizeValue').addEventListener('input', () => {
+            document.getElementById('size').value = document.getElementById('sizeValue').value;
+            drawHexagons();
+            saveSettings();
+        });
+        document.getElementById('sizeValue').addEventListener('keydown', (event) => {
+            if (event.key === 'ArrowUp') {
+                document.getElementById('sizeValue').value = parseInt(document.getElementById('sizeValue').value) + 1;
+            } else if (event.key === 'ArrowDown') {
+                document.getElementById('sizeValue').value = parseInt(document.getElementById('sizeValue').value) - 1;
+            }
+            document.getElementById('size').value = document.getElementById('sizeValue').value;
+            drawHexagons();
+            saveSettings();
+        });
+
+        document.getElementById('colorValue').addEventListener('input', () => {
+            document.getElementById('color').value = document.getElementById('colorValue').value;
+            drawHexagons();
+            saveSettings();
+        });
+
+        document.getElementById('marginValue').addEventListener('input', () => {
+            document.getElementById('margin').value = document.getElementById('marginValue').value;
+            drawHexagons();
+            saveSettings();
+        });
+        document.getElementById('marginValue').addEventListener('keydown', (event) => {
+            if (event.key === 'ArrowUp') {
+                document.getElementById('marginValue').value = parseInt(document.getElementById('marginValue').value) + 1;
+            } else if (event.key === 'ArrowDown') {
+                document.getElementById('marginValue').value = parseInt(document.getElementById('marginValue').value) - 1;
+            }
+            document.getElementById('margin').value = document.getElementById('marginValue').value;
+            drawHexagons();
+            saveSettings();
+        });
+
+        document.getElementById('bgColorValue').addEventListener('input', () => {
+            document.getElementById('bgColor').value = document.getElementById('bgColorValue').value;
+            drawHexagons();
+            saveSettings();
+        });
+
+        document.getElementById('brightnessAdjustmentValue').addEventListener('input', () => {
+            document.getElementById('brightnessAdjustment').value = document.getElementById('brightnessAdjustmentValue').value;
+            drawHexagons();
+            saveSettings();
+        });
+        document.getElementById('brightnessAdjustmentValue').addEventListener('keydown', (event) => {
+            if (event.key === 'ArrowUp') {
+                document.getElementById('brightnessAdjustmentValue').value = parseInt(document.getElementById('brightnessAdjustmentValue').value) + 1;
+            } else if (event.key === 'ArrowDown') {
+                document.getElementById('brightnessAdjustmentValue').value = parseInt(document.getElementById('brightnessAdjustmentValue').value) - 1;
+            }
+            document.getElementById('brightnessAdjustment').value = document.getElementById('brightnessAdjustmentValue').value;
+            drawHexagons();
+            saveSettings();
+        });
+
+        window.addEventListener('resize', () => {
+            drawHexagons();
+        });
+
+        loadSettings();
+        drawHexagons();
+    </script>
+</body>
+</html>
